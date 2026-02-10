@@ -1,0 +1,50 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+
+# --- Environments ---
+.env
+.venv/
+venv/
+ENV/
+
+# --- Python Dev Tools ---
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# --- Model Weights & Large Files ---
+*.pt
+*.pth
+*.onnx
+*.engine
+*.tflite
+
+# --- Data & Database ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- macOS ---
+.DS_Store
+
+# --- Windows ---
+Thumbs.db
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- uv specific ---
+.uv/
+
+# --- Streamlit ---
+.streamlit/
