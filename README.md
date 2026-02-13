@@ -10,6 +10,7 @@ Facial recognition system that detects, remembers, and greets people it has seen
 
 ### System Pipeline 
 
+```
 Portable Camera (laptop/phone/Jetson)
     │
     ▼
@@ -66,7 +67,7 @@ Portable Camera (laptop/phone/Jetson)
 │ "Who is this?"       │  shows clustered unknown faces
 └──────────────────────┘ 
 
-
+```
 --- 
 
 ### Active python env 
