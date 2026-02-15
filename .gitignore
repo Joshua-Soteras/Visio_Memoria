@@ -19,6 +19,7 @@ ENV/
 .ruff_cache/
 
 # --- Model Weights & Large Files ---
+*dinov3/
 *.pt
 *.pth
 *.onnx
