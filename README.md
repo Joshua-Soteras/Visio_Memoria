@@ -4,7 +4,11 @@ Facial recognition system that detects, remembers, and greets people it has seen
 
 
 
+---
 
+Visio_Memoria 
+
+Tech Stack 
 
 --- 
 
