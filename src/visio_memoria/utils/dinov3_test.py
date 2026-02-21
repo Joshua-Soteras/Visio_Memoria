@@ -447,11 +447,10 @@ def main():
             weights=WEIGHTS
         )
         print("Model has Successfully Loaded\n")
-    except Exception as  e: 
+    except Exception as e: 
         print("ERROR (Loading Model: Could not load model correctly\n)")
         exit()
 
-    
     
     # What model.eval()?
     # Neural networks behave differently during training vs inference.
