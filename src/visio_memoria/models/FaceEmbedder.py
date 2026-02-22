@@ -92,19 +92,21 @@ class FaceEmbedder:
             device -> device to load model 
         """
         
-        self.device = device or get_device
+        self.device = device or get_device()
 
 
         #Loading Model 
         print("\n---Config: Loading Model and Mode")
-        print("Loading ${model_name} model and using ${device} device")
+        print("Loading ${self.model_name} model and using ${self.device} device")
         try: 
             self.model = torch.hub.load(
                 model_repo, 
                 model_name, 
                 source = 'local',
-                weights = WEIGHTS
+                weights = weights
             )
+            
+            self.model = self.model.to(self.device)
             print("Model has succesfully loaded ")
         
         except Exception as e: 
@@ -145,7 +147,7 @@ class FaceEmbedder:
         """
             frame comes a values of [height, width, channels color]
         """ 
-        height, width = frame[:2]
+        height, width = frame.shape[:2]
 
 
         """
@@ -320,17 +322,28 @@ def example_integration():
 
     # Load the YOLOv8-face detector. This reads the .pt weights file from disk.
     # detector is now a callable — pass it a frame, get back detection results.
-    detector = YOLO("yolov8n-face.pt")
+
+    path =os.path.join(cur_dir, "yolov8-face", "yolov8n-face.pt")
+    detector = YOLO(path)
 
     # get_embedder() returns the singleton FaceEmbedder instance.
     # If called elsewhere first, this returns the already-loaded model (no reload).
     # If this is the first call, it loads DINOv3 now (~342 MB, takes a few seconds).
     embedder = get_embedder()
 
+
+    # --- DEBUGGING SECTION ---
+    print("Attempting to open camera...")
     # cv2.VideoCapture(0) opens the default webcam (index 0).
     # If 0 fails (wrong camera), try 1 or 2.
     # cap is a stateful object — you call cap.read() repeatedly to pull frames.
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0) # Try 0, then 1 if this fails
+
+    if not cap.isOpened():
+        print("ERROR: Could not open video source.")
+        exit()
+    else:
+        print("Camera initialized successfully.")
 
     # ── Main inference loop ────────────────────────────────────────────────────
     # This loop runs once per frame (~30x per second at 30fps).
@@ -350,6 +363,7 @@ def example_integration():
         # a list of Results objects — one per image in the batch (here, just 1).
         # verbose=False suppresses YOLO's per-frame console output.
         results = detector(frame, verbose=False)
+        
 
         # results is a list — iterate over each Results object.
         # In single-frame inference there is only results[0], but the loop
@@ -360,6 +374,8 @@ def example_integration():
             # Skip to the next result rather than crashing.
             if result.boxes is None:
                 continue
+
+          
 
             # Each box is one detected face.
             # If 3 faces are in the frame, result.boxes has 3 rows.
@@ -407,25 +423,26 @@ def example_integration():
         # ── Display ────────────────────────────────────────────────────────────
         # Show the raw frame in a window. Swap in results[0].plot() here to draw
         # YOLO's bounding boxes on screen (useful for debugging detection quality).
-        cv2.imshow("Lumemoria", frame)
+        cv2.imshow("Lumemoria", results[0].plot())
 
         # waitKey(1) pauses 1ms and checks for a keypress.
         # & 0xFF masks to the last 8 bits (needed on some platforms for correct comparison).
-        # Pressing 'q' breaks the loop and exits cleanly.
+        # Pressing 'q' breaks the loop ancled exits cleanly.
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
-
-                                                                              
-
-
-        
-        
-
     
-         
+    cap.release()
+    cv2.destroyAllWindows()
 
 
-        
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+# When this file is run directly (`python FaceEmbedder.py`), call the demo.
+# When it is imported by another module, this block is skipped — so importing
+# get_embedder() or FaceEmbedder never accidentally triggers the webcam loop.
+if __name__ == "__main__":
+    example_integration()
+
 
 
 
