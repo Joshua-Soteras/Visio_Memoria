@@ -244,7 +244,7 @@ class FaceDatabaseFAISS:
         if n < self.IVF_THRESHOLD:
             # ── EXACT SEARCH (IndexFlatIP) ──
             #brute force will still be fast enough at this point 
-            # Inner product on L2-normalized vectors = cosine similarity
+            # Inner product on  vectors = cosine similarity
             self._faiss_index = faiss.IndexFlatIP(self.embed_dim)
             self._faiss_index.add(emb_matrix)
             print(f"FAISS index: IndexFlatIP with {n} embeddings")
@@ -276,8 +276,14 @@ class FaceDatabaseFAISS:
 
 
             # IVF requires training on representative data
+            # needs to know where to place the cluster centroids 
             self._faiss_index.train(emb_matrix)
+
+            #after train, the centroids are laid out, push the data to clusters 
             self._faiss_index.add(emb_matrix)
+
+            # Set how many clusters FAISS should check during a search
+            # (higher = more accurate, but slower)
             self._faiss_index.nprobe = self.IVF_NPROBE
             print(f"FAISS index: IndexIVFFlat with {n} embeddings, {nlist} clusters")
 
@@ -295,11 +301,15 @@ class FaceDatabaseFAISS:
 
 
     def save_faiss_index(self):
+        
         """Persist the FAISS index to disk for faster restarts."""
         if self._faiss_index is not None:
+            #save the actual FAISS math/vectprs into highly compressed binary file (.bin)
             index_path = str(self.db_path / "faiss_index.bin")
             faiss.write_index(self._faiss_index, index_path)
 
+            # 2. Save our parallel Python list of IDs into a standard JSON file.
+            # We MUST save both, otherwise FAISS will find matches but we won't know who they belong to!
             import json
             mapping_path = str(self.db_path / "faiss_mapping.json")
             with open(mapping_path, "w") as f:
@@ -309,17 +319,21 @@ class FaceDatabaseFAISS:
 
 
     def load_faiss_index(self) -> bool:
+
         """Load a previously saved FAISS index. Returns True if successful."""
         import json
         index_path = self.db_path / "faiss_index.bin"
         mapping_path = self.db_path / "faiss_mapping.json"
 
         if index_path.exists() and mapping_path.exists():
+
+            #loading the vector math back into FAISS memory 
             self._faiss_index = faiss.read_index(str(index_path))
             with open(mapping_path) as f:
                 self._faiss_id_to_person_id = json.load(f)
             print(f"Loaded FAISS index ({self._faiss_index.ntotal} vectors)")
             return True
+        
         return False
 
 
@@ -347,15 +361,22 @@ class FaceDatabaseFAISS:
         Returns:
             (person_id, similarity) or (None, best_similarity)
         """
+
         if self._faiss_index is None or self._faiss_index.ntotal == 0:
             return None, 0.0
 
         # FAISS expects float32 numpy, shape (1, dim)
+        #pytorch 1d tensor and reshapes it 
         query_np = query_emb.numpy().astype(np.float32).reshape(1, -1)
 
         # Search for top-1 match
+        #returns back two list
+        #distances  (similarity scores )
+        # indicies (the row numbers)
+        #self._faiss_index .search method is determined above (cosine similary vs euclidean distance)
         distances, indices = self._faiss_index.search(query_np, k=1)
 
+        #extract the actual numbers from those lists 
         best_sim = float(distances[0][0])
         best_faiss_idx = int(indices[0][0])
 
@@ -363,10 +384,15 @@ class FaceDatabaseFAISS:
         if best_faiss_idx < 0:
             return None, 0.0
 
+        #if the similarity score is higher than 65 person 
+        # 
         if best_sim >= threshold:
+
+            #look in parallet python list to get the real person id
             person_id = self._faiss_id_to_person_id[best_faiss_idx]
             return person_id, best_sim
 
+        #score is too low return nothing
         return None, best_sim
 
 
@@ -381,10 +407,13 @@ class FaceDatabaseFAISS:
         if self._faiss_index is None or self._faiss_index.ntotal == 0:
             return []
 
+        #make sure we don't ask for 5 results if the data
         k = min(k, self._faiss_index.ntotal)
         query_np = query_emb.numpy().astype(np.float32).reshape(1, -1)
         distances, indices = self._faiss_index.search(query_np, k=k)
 
+
+        #loop through the results, grab the real person ids, and put then in a list 
         results = []
         for sim, idx in zip(distances[0], indices[0]):
             if idx < 0:
@@ -393,12 +422,16 @@ class FaceDatabaseFAISS:
             results.append((pid, float(sim)))
         return results
 
-    # ─────────────────────────────────────────
-    # RECOGNITION EVENT (unchanged)
-    # ─────────────────────────────────────────
 
+
+    #=========================================
+    # RECOGNITION EVENT (unchanged)
+    # updating the database once we see someone 
+    #=========================================
     def record_sighting(self, person_id: int, similarity: float):
         now = datetime.now().isoformat()
+
+
         self.conn.execute(
             "INSERT INTO sightings (person_id, timestamp, similarity) VALUES (?, ?, ?)",
             (person_id, now, similarity)
@@ -407,27 +440,35 @@ class FaceDatabaseFAISS:
             "UPDATE persons SET last_seen = ?, visit_count = visit_count + 1 WHERE person_id = ?",
             (now, person_id)
         )
+
+        #keepiing the python dictionary synced with the database 
         self.conn.commit()
         person = self.persons[person_id]
         person.last_seen = now
         person.visit_count += 1
 
-    # ─────────────────────────────────────────
-    # UNLABELED QUEUE (unchanged)
-    # ─────────────────────────────────────────
 
+
+    #=========================================
+    # UNLABELED QUEUE (unchanged)
+    # adding strangers to a queue to be identitfied 
+    #=========================================
     def queue_unlabeled(self, face_image: Image.Image, embedding: torch.Tensor) -> str:
         now = datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
         existing = list(self.unlabeled_dir.glob(f"{timestamp}_*.png"))
         idx = len(existing)
 
+        #save the picture of the face , human can looj at it later 
         img_path = self.unlabeled_dir / f"{timestamp}_{idx}.png"
-        emb_path = self.unlabeled_dir / f"{timestamp}_{idx}.pt"
 
+        #save the math/vector (.pt) so the ai can use it later 
+        emb_path = self.unlabeled_dir / f"{timestamp}_{idx}.pt"
         face_image.save(str(img_path))
         torch.save(embedding, str(emb_path))
 
+
+        #add this person to the unlabeled database
         self.conn.execute(
             "INSERT INTO unlabeled (image_path, embedding_path, timestamp) VALUES (?, ?, ?)",
             (str(img_path), str(emb_path), now.isoformat())
@@ -436,10 +477,11 @@ class FaceDatabaseFAISS:
         print(f"  📸 Queued unknown face: {img_path.name}")
         return str(img_path)
 
-    # ─────────────────────────────────────────
-    # LABELING (updated to maintain FAISS index)
-    # ─────────────────────────────────────────
 
+
+    #=========================================
+    # LABELING (updated to maintain FAISS index)
+    #=========================================
     def get_unlabeled(self) -> list[dict]:
         cursor = self.conn.execute(
             "SELECT id, image_path, embedding_path, timestamp FROM unlabeled WHERE reviewed = 0"
@@ -449,20 +491,27 @@ class FaceDatabaseFAISS:
             for r in cursor
         ]
 
+
     def label_face(self, unlabeled_id: int, name: str) -> int:
+
+        #.fetchone() grabs one specific row instead of returning a list
         row = self.conn.execute(
             "SELECT embedding_path, timestamp FROM unlabeled WHERE id = ?", (unlabeled_id,)
         ).fetchone()
+
         if not row:
             raise ValueError(f"Unlabeled record {unlabeled_id} not found")
 
+        #load their math/vector off the hard dribve 
         emb_path, timestamp = row
         embedding = torch.load(emb_path, weights_only=True)
 
+        #check if the name the human typed already exists with the system
         existing = self.conn.execute(
             "SELECT person_id FROM persons WHERE name = ?", (name,)
         ).fetchone()
 
+        #if the person exists
         if existing:
             person_id = existing[0]
             self._add_embedding_to_person(person_id, embedding)
@@ -477,6 +526,7 @@ class FaceDatabaseFAISS:
 
         print(f"  ✅ Labeled as '{name}' (person_id={person_id})")
         return person_id
+
 
     def _create_person(self, name: str, embedding: torch.Tensor, first_seen: str) -> int:
         cursor = self.conn.execute(
@@ -495,6 +545,7 @@ class FaceDatabaseFAISS:
         )
         return person_id
 
+
     def _add_embedding_to_person(self, person_id: int, embedding: torch.Tensor):
         person = self.persons[person_id]
         person.embeddings.append(embedding)
@@ -502,10 +553,11 @@ class FaceDatabaseFAISS:
         emb_path = self.embeddings_dir / f"person_{person_id}.pt"
         torch.save(torch.stack(person.embeddings), str(emb_path))
 
+
+
     # ─────────────────────────────────────────
     # ACTIVITY NOTES (unchanged)
     # ─────────────────────────────────────────
-
     def update_notes(self, person_id: int, notes: str):
         self.conn.execute(
             "UPDATE persons SET notes = ? WHERE person_id = ?", (notes, person_id)
