@@ -35,6 +35,13 @@ from datetime import datetime
 from PIL import Image
 from dataclasses import dataclass, field
 
+import os
+
+# Absolute path to the default database directory, resolved relative to this file.
+# Using abspath + dirname ensures the path is correct regardless of where the
+# script is invoked from.
+DFEAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "db_paths")
+
 
 @dataclass
 class PersonRecord:
@@ -88,7 +95,8 @@ class FaceDatabaseFAISS:
     # Number of clusters to search (higher = more accurate, slower)
     IVF_NPROBE = 10
 
-    def __init__(self, db_path: str = "", embed_dim: int = 768):
+    def __init__(self, db_path: str = DFEAULT_DB_PATH , embed_dim: int = 768):
+        
         self.db_path = Path(db_path)
         self.embeddings_dir = self.db_path / "embeddings"
         self.unlabeled_dir = self.db_path / "unlabeled"
@@ -153,7 +161,7 @@ class FaceDatabaseFAISS:
         #self.conn... returns a "cursor" object
         #cursor is just hovering over the results 
         # Safer alternative than the original code :
-        cursor = self.conn.execute("SELECT id, name, first_seen, last_seen, visit_count, notes FROM persons")
+        cursor = self.conn.execute("SELECT person_id, name, first_seen, last_seen, visit_count, notes FROM persons")
         #cursor = self.conn.execute("SELECT * FROM persons")
 
         #2 fetching rows one by one 

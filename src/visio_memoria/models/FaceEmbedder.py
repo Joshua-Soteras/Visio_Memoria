@@ -16,6 +16,8 @@ model = torch.hub.load(
             weights=WEIGHTS      
 '''
 
+
+
 #===================================================
 #default model will be dinov3_vitb16 (base model)
 cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -35,12 +37,10 @@ def get_device():
     elif torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
-
 #===================================================
 
 
 _instance: "FaceEmbedder | None" = None 
-
 class FaceEmbedder: 
 
     
