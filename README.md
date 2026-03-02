@@ -1,17 +1,24 @@
 # Visio_Memoria
 
-Facial recognition system that detects, remembers, and greets people it has seen before. 
+Facial recognition system that detects, remembers, and greets people it has seen before.
 
-
+> A real-time facial recognition pipeline combining YOLOv8-Face detection with DINOv3 ViT-B/16 embeddings, running locally on Apple Silicon with a planned FAISS + SQLite identity database.
 
 ---
 
-Visio_Memoria 
-
 ## Tech Stack
 
+- **Language:** Python 3.14
+- **ML Framework:** PyTorch
+- **Face Detection:** YOLOv8-Face (derronqi fork)
+- **Feature Extraction:** DINOv3 ViT-B/16 (Meta Research)
+- **Computer Vision:** OpenCV
+- **Image Processing:** torchvision v2
+- **Hardware Acceleration:** MPS (Apple Silicon), CUDA, CPU
+- **Package Management:** UV
+- **Planned:** FAISS, SQLite, Streamlit
 
---- 
+---
 
 
 ## System Pipeline 
