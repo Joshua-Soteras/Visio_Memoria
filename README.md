@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="VM_Logo.png" alt="Visio Memoria Logo" width="300"/>
+</p>
+
 # Visio_Memoria
 
 Facial recognition system that detects, remembers, and greets people it has seen before.
